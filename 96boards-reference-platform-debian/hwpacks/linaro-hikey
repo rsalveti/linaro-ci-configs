@@ -39,8 +39,6 @@ assume_installed:
 - libnl-3-200
 - libnl-genl-3-200
 packages:
-- linux-image-arm64
-- linux-headers-arm64
 - firmware-linux
 - firmware-ti-connectivity
 - ti-uim
