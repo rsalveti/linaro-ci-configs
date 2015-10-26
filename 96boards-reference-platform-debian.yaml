@@ -54,7 +54,7 @@
             sudo wget https://git.linaro.org/ci/linaro-image-tools.git/blob_plain/HEAD:/linaro-hwpack-install -O /usr/bin/linaro-hwpack-install
             sudo chmod +x /usr/bin/linaro-hwpack-install
             sudo wget https://raw.githubusercontent.com/rsalveti/linaro-image-tools/master/linaro_image_tools/media_create/chroot_utils.py -O /usr/lib/pymodules/python2.7/linaro_image_tools/media_create/chroot_utils.py
-            git clone --depth 1 http://git.linaro.org/ci/job/configs.git
+            git clone -b local --depth 1 https://github.com/rsalveti/linaro-ci-configs.git
 
             # Get the reference kernel packages
             KERNEL_BUILD_NUMBER=`wget -q --no-check-certificate -O - https://ci.linaro.org/view/96boards/job/96boards-reference-kernel/lastSuccessfulBuild/buildNumber`
