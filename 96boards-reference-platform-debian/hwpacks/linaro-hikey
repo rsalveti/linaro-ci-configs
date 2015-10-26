@@ -36,6 +36,8 @@ assume_installed:
 - kmod
 - netbase
 - udev
+- libnl-3-200
+- libnl-genl-3-200
 packages:
 - linux-image-arm64
 - linux-headers-arm64
