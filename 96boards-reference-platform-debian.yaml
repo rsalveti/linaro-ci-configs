@@ -40,7 +40,7 @@
             {
               cd ${WORKSPACE}
               sudo kpartx -dv ${BOARD}-jessie_*.img || true
-              rm -rf configs out
+              rm -rf configs
             }
 
             # Builder setup
