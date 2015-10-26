@@ -1,10 +1,14 @@
 - job:
     name: 96boards-reference-platform-debian
-    project-type: matrix
+    project-type: freestyle
     defaults: global
     logrotate:
         daysToKeep: 30
         numToKeep: 30
+    parameters:
+        - string:
+            name: BOARD
+            default: 'hikey'
     properties:
         - authorization:
             anonymous:
@@ -18,38 +22,13 @@
                 - job-build
                 - job-cancel
     disabled: false
-    node: build
-    child-workspace: .
+    node: docker-utopic-amd64
     display-name: '96boards - Reference Platform - Debian'
-    axes:
-        - axis:
-            type: user-defined
-            name: BOARD
-            values:
-                - hikey
-        - axis:
-            type: slave
-            name: label
-            values:
-                - docker-utopic-amd64
-    execution-strategy:
-        sequential: true
-        touchstone:
-            expr: 'BOARD=="hikey"'
     wrappers:
         - timestamps
         - build-name:
             name: '#${BUILD_NUMBER}'
-        - matrix-tie-parent:
-            node: build
     builders:
-        - copyartifact:
-            project: rsalveti-debian-arm64-rootfs/label=docker-jessie-arm64,rootfs=alip
-            filter: 'out/linaro-jessie-alip-*.tar.gz'
-            target: artifacts
-            parameter-filters: 'label=docker-jessie-arm64,rootfs=alip'
-        - linaro-publish-token:
-            host: builds.96boards.org
         - shell: |
             #!/bin/bash
 
@@ -65,7 +44,7 @@
             }
 
             # Builder setup
-            sudo sed -i -e 's/archive.ubuntu.com\|security.ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list
+            sudo sed -i -e 's/archive.ubuntu.com\|security.ubuntu.com/192.168.1.30:3142\/old-releases.ubuntu.com/g' /etc/apt/sources.list
             sudo apt-get update
             sudo apt-get install -y kpartx python-pycurl
             wget http://repo.linaro.org/ubuntu/linaro-overlay/pool/main/a/android-tools/android-tools-fsutils_4.2.2+git20130218-3ubuntu41+linaro1_amd64.deb
@@ -74,6 +53,7 @@
             # FIXME - temporary workaround
             sudo wget https://git.linaro.org/ci/linaro-image-tools.git/blob_plain/HEAD:/linaro-hwpack-install -O /usr/bin/linaro-hwpack-install
             sudo chmod +x /usr/bin/linaro-hwpack-install
+            sudo wget https://raw.githubusercontent.com/rsalveti/linaro-image-tools/master/linaro_image_tools/media_create/chroot_utils.py -O /usr/lib/pymodules/python2.7/linaro_image_tools/media_create/chroot_utils.py
             git clone --depth 1 http://git.linaro.org/ci/job/configs.git
 
             # Get the reference kernel packages
@@ -93,10 +73,12 @@
             # Get rootfs
             export ROOTFS_BUILD_NUMBER=`wget -q --no-check-certificate -O - https://ci.linaro.org/job/debian-arm64-rootfs/label=build,rootfs=alip/lastSuccessfulBuild/buildNumber`
             export ROOTFS_BUILD_TIMESTAMP=`wget -q --no-check-certificate -O - https://ci.linaro.org/job/debian-arm64-rootfs/label=build,rootfs=alip/lastSuccessfulBuild/buildTimestamp?format=yyyyMMdd`
-            export ROOTFS_BUILD_URL="http://snapshots.linaro.org/debian/images/alip-arm64/${ROOTFS_BUILD_NUMBER}/linaro-jessie-alip-${ROOTFS_BUILD_TIMESTAMP}-${ROOTFS_BUILD_NUMBER}.tar.gz"
+            #export ROOTFS_BUILD_URL="http://snapshots.linaro.org/debian/images/alip-arm64/${ROOTFS_BUILD_NUMBER}/linaro-jessie-alip-${ROOTFS_BUILD_TIMESTAMP}-${ROOTFS_BUILD_NUMBER}.tar.gz"
+            export ROOTFS_BUILD_URL="https://ci.linaro.org/view/All/job/rsalveti-debian-arm64-rootfs/5/label=docker-jessie-arm64,rootfs=alip/artifact/out/linaro-jessie-alip-20151023-5.tar.gz"
             wget --progress=dot -e dotbytes=2M ${ROOTFS_BUILD_URL}
             #ROOTFS_BUILD_TAR=linaro-jessie-alip-${ROOTFS_BUILD_TIMESTAMP}-${ROOTFS_BUILD_NUMBER}.tar.gz
-            ROOTFS_BUILD_TAR=`ls artifacts/out/linaro-jessie-alip-*.tar.gz`
+            #ROOTFS_BUILD_TAR=`ls artifacts/out/linaro-jessie-alip-*.tar.gz`
+            ROOTFS_BUILD_TAR=`ls linaro-jessie-alip-*.tar.gz`
 
             # Create pre-built image(s)
             linaro-media-create --dev fastmodel --output-directory ${WORKSPACE} --image-file ${BOARD}-jessie_alip_${VERSION}.img --image-size 2G --binary ${ROOTFS_BUILD_TAR} --hwpack hwpack_linaro-${BOARD}_*.tar.gz --hwpack-force-yes --bootloader uefi --part-table gpt
@@ -149,7 +131,7 @@
                 rm -rf boot-fat
 
                 # Compress boot partition image
-                gzip -9 out/${BOARD}/boot-fat.uefi.img
+                gzip -4 out/${BOARD}/boot-fat.uefi.img
 
                 cat >> out/${BOARD}/README.txt << EOF
             * uefi: http://builds.96boards.org/snapshots/reference-platform/uefi/${FASTBOOT_EFI_BUILD_NUMBER}/release/hikey
@@ -163,23 +145,14 @@
             sudo rm -rf boot rootfs
 
             # Compress image
-            gzip -9 out/${BOARD}/${BOARD}-jessie_alip_${VERSION}.emmc.img
+            gzip -4 out/${BOARD}/${BOARD}-jessie_alip_${VERSION}.emmc.img
 
             # Publish remaining files
             cp hwpack* out/${BOARD}
 
             # Create MD5SUMS file
             (cd out/${BOARD} && md5sum * > MD5SUMS.txt)
-
-            # Publish
-            test -d ${HOME}/bin || mkdir ${HOME}/bin
-            wget https://git.linaro.org/ci/publishing-api.git/blob_plain/HEAD:/linaro-cp.py -O ${HOME}/bin/linaro-cp.py
-            time python ${HOME}/bin/linaro-cp.py \
-              --server ${PUBLISH_SERVER} \
-              out/${BOARD} snapshots/reference-platform/debian/${BUILD_NUMBER}/${BOARD}
-            python ${HOME}/bin/linaro-cp.py \
-              --server ${PUBLISH_SERVER} \
-              --make-link snapshots/reference-platform/debian/${BUILD_NUMBER}
     publishers:
-        - email:
-            recipients: 'ricardo.salveti@linaro.org'
+        - archive:
+            artifacts: 'out/${BOARD}/*'
+            latest-only: true
