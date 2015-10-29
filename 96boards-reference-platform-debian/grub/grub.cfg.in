@@ -7,3 +7,8 @@ menuentry 'Debian GNU/Linux' {
     initrd /boot/initrd.img
     devicetree /boot/dtbs/DEVICE_TREE
 }
+
+menuentry 'Fastboot' {
+    search.fs_label BOOT\ IMG boot_part
+    chainloader ($boot_part)/fastboot.efi
+}
